@@ -6,8 +6,8 @@ const statusDiv = document.getElementById('fileStatus');
 const uploadButton = document.getElementById('uploadButton');
 
 // OpenAI API configuration
-const OPENAI_API_KEY = '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';
-const OPENAI_MODEL = 'gpt-4';
+//const OPENAI_API_KEY = '
+//const OPENAI_MODEL = 'gpt-4';
 
 // Initialize OpenAI client
 const openai = {
@@ -193,15 +193,26 @@ function displaySummary(text) {
 }
 
 function formatKeyPoints(text) {
-    // Extract exactly 5 key points with bullet points
-    const points = text.split(/\n|•|-/).filter(Boolean).slice(0, 5);
-    return points.map(point => `• ${point.trim()}`).join('\n');
-}
+    // Clean up text by removing all dots and special characters
+    const cleanedText = text
+        .replace(/•\s*\d+\.?\s*/g, '')  // Remove number bullets with optional dot
+        .replace(/•\s*/g, '')            // Remove regular bullet points
+        .replace(/\./g, '')              // Remove all dots
+        .replace(/\s+/g, ' ')            // Remove extra spaces
+        .trim();
 
-function formatKeyPoints(text) {
-    // Extract exactly 5 key points with bullet points
-    const points = text.split(/\n|•|-/).filter(Boolean).slice(0, 5);
-    return points.map(point => `• ${point.trim()}`).join('\n');
+    // Split into points using multiple delimiters and clean each point
+    const points = cleanedText
+        .split(/\n/)                     // Split by newlines
+        .map(point => point.trim())       // Clean up each point
+        .filter(point => point.length > 0) // Remove empty points
+        .slice(0, 5);                     // Take first 5 points
+
+    // Format and return the points
+    return points
+        .map(point => point.replace(/\s+/g, ' ').trim())  // Clean up spaces in each point
+        .map(point => `• ${point}`)      // Add bullet points
+        .join('\n');                    // Join with newlines
 }
 
 function formatMCQs(text) {
