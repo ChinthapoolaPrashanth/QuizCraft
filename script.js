@@ -6,7 +6,6 @@ const statusDiv = document.getElementById('fileStatus');
 const uploadButton = document.getElementById('uploadButton');
 
 // OpenAI API configuration
-//const OPENAI_API_KEY = '
 //const OPENAI_MODEL = 'gpt-4';
 
 // Initialize OpenAI client
