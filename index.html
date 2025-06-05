@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizCraft - AI Learning Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/llama.js@0.1.1/dist/llama.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 QuizCraft</h1>
+        <p>Transform your articles into AI-powered quizzes, summaries, and notes—all offline.</p>
+
+        <div class="input-section">
+            <div class="file-upload">
+                <button onclick="document.getElementById('fileInput').click()">
+                    <i class="fas fa-upload"></i> Upload File
+                </button>
+                <input type="file" id="fileInput" accept=".txt,.pdf,.doc,.docx" style="display: none;">
+            </div>
+            <textarea id="inputText" placeholder="Paste or type your content here..."></textarea>
+        </div>
+
+        <div class="button-group">
+            <button id="generateBtn">⚡ Generate Quiz & Notes</button>
+            <button id="exportPdfBtn">📄 Export PDF</button>
+        </div>
+
+        <div class="output">
+            <div class="section">
+                <h3>📝 Summary</h3>
+                <div id="summary">No summary yet.</div>
+            </div>
+
+            <div class="section">
+                <h3>📌 Key Points</h3>
+                <ul id="keyPoints"></ul>
+            </div>
+
+            <div class="section">
+                <h3>❓ Multiple Choice Questions</h3>
+                <div id="mcqs"></div>
+            </div>
+
+            <div class="section">
+                <h3>✍️ Fill-in-the-Blanks</h3>
+                <div id="blanks"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
