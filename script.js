@@ -1,6 +1,13 @@
+// UI Elements
+const progressBar = document.getElementById('progress');
+const filePreview = document.getElementById('filePreview');
+const fileInfo = document.getElementById('fileInfo');
+const statusDiv = document.getElementById('fileStatus');
+const uploadButton = document.getElementById('uploadButton');
+
 // OpenAI API configuration
-//const OPENAI_API_KEY = '';
-//const OPENAI_MODEL = 'gpt-4';
+const OPENAI_API_KEY = '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';
+const OPENAI_MODEL = 'gpt-4';
 
 // Initialize OpenAI client
 const openai = {
@@ -51,6 +58,15 @@ const openai = {
 // Loading state management
 let isLoading = false;
 
+// Constants for file handling
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const SUPPORTED_TYPES = [
+    'text/plain',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+];
+
 function setLoading(isLoading) {
     const generateBtn = document.getElementById('generateBtn');
     generateBtn.disabled = isLoading;
@@ -61,22 +77,104 @@ function setLoading(isLoading) {
 document.getElementById('fileInput').addEventListener('change', async (e) => {
     try {
         const file = e.target.files[0];
-        if (file) {
-            const text = await readFile(file);
-            document.getElementById('inputText').value = text;
+        if (!file) return;
+
+        // Reset UI
+        progressBar.style.width = '0%';
+        filePreview.textContent = '';
+        fileInfo.textContent = '';
+        statusDiv.textContent = '';
+
+        // Validate file
+        if (!SUPPORTED_TYPES.includes(file.type)) {
+            throw new Error(`Unsupported file type. Please upload a text, PDF, or Word document.`);
         }
+
+        if (file.size > MAX_FILE_SIZE) {
+            throw new Error(`File too large. Please upload a file smaller than 5MB.`);
+        }
+
+        // Show file info
+        fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+        // Start reading
+        statusDiv.textContent = 'Processing file...';
+        uploadButton.disabled = true;
+
+        // Read file with progress
+        const text = await readFileWithProgress(file);
+        
+        // Update UI
+        document.getElementById('inputText').value = text;
+        filePreview.textContent = text.substring(0, 200) + (text.length > 200 ? '...' : '');
+        statusDiv.textContent = 'File processed successfully';
+        uploadButton.disabled = false;
+
     } catch (error) {
-        console.error('Error reading file:', error);
-        alert('Error reading file. Please try again.');
+        console.error('Error:', error);
+        statusDiv.textContent = `Error: ${error.message}`;
+        uploadButton.disabled = false;
+        alert(error.message);
     }
 });
 
-async function readFile(file) {
+// Helper function to read file with progress
+async function readFileWithProgress(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = reject;
-        reader.readAsText(file);
+        let loaded = 0;
+        
+        reader.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const progress = (e.loaded / e.total) * 100;
+                progressBar.style.width = `${progress}%`;
+                statusDiv.textContent = `Processing ${Math.round(progress)}%`;
+            }
+        };
+
+        reader.onloadstart = () => {
+            loaded = 0;
+            statusDiv.textContent = 'Starting file processing...';
+        };
+
+        reader.onload = async (e) => {
+            const arrayBuffer = e.target.result;
+            
+            if (file.name.toLowerCase().endsWith('.docx')) {
+                try {
+                    statusDiv.textContent = 'Converting Word document to text...';
+                    const result = await mammoth.convertToHtml({
+                        arrayBuffer: arrayBuffer,
+                        convertImage: mammoth.images.imgElement({
+                            style: 'width:100%;'
+                        })
+                    });
+                    
+                    // Clean up HTML and extract text
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(result.value, 'text/html');
+                    const text = doc.body.textContent || '';
+                    resolve(text.trim());
+                } catch (error) {
+                    console.error('Word document processing error:', error);
+                    reject(new Error('Failed to process Word document. Please ensure it is a valid .docx file.'));
+                }
+            } else if (file.name.toLowerCase().endsWith('.pdf')) {
+                reject(new Error('PDF processing is not currently supported. Please convert to text first.'));
+            } else {
+                // For text files, convert ArrayBuffer to string
+                const decoder = new TextDecoder();
+                const text = decoder.decode(arrayBuffer).trim();
+                resolve(text);
+            }
+        };
+
+        reader.onerror = (e) => {
+            console.error('File reading error:', e);
+            reject(new Error('Failed to read file. Please try again.'));
+        };
+
+        reader.readAsArrayBuffer(file);
     });
 }
 
@@ -89,10 +187,15 @@ function cleanText(text) {
     return text.trim().replace(/\s+/g, ' ');
 }
 
-// Content display functions
 function displaySummary(text) {
     const summaryEl = document.getElementById('summary');
     summaryEl.textContent = text;
+}
+
+function formatKeyPoints(text) {
+    // Extract exactly 5 key points with bullet points
+    const points = text.split(/\n|•|-/).filter(Boolean).slice(0, 5);
+    return points.map(point => `• ${point.trim()}`).join('\n');
 }
 
 function formatKeyPoints(text) {
@@ -109,16 +212,17 @@ function formatMCQs(text) {
         const question = parts[0].replace(/^Question:\s*/, '');
         const options = parts.slice(1).map(opt => opt.trim());
         return `
-            <div class="question-text">${question}</div>
-            <ul class="options">
-                ${options.map(opt => `<li>${opt}</li>`).join('')}
-            </ul>
+            <div class="question">
+                <div class="question-text">${question}</div>
+                <ul class="options">
+                    ${options.map(opt => `<li>${opt}</li>`).join('')}
+                </ul>
+            </div>
         `;
     }).join('');
 }
 
 function formatBlanks(text) {
-    // Split into blanks and format each one
     const blanks = text.split('\n').filter(Boolean);
     return blanks.map(blank => {
         const parts = blank.split('(');
@@ -126,7 +230,9 @@ function formatBlanks(text) {
         const answer = parts[1]?.split(')')[0]?.trim() || '';
         return `
             <div class="blank">
-                ${question} (${answer})
+                <div class="blank-text">${question}</div>
+                <input type="text" class="blank-input" placeholder="Type your answer...">
+                <div class="blank-answer">Answer: ${answer}</div>
             </div>
         `;
     }).join('');
@@ -134,24 +240,12 @@ function formatBlanks(text) {
 
 function displayKeyPoints(text) {
     const list = document.getElementById('keyPoints');
-    list.innerHTML = formatKeyPoints(text);
+    list.innerHTML = text;
 }
 
 function displayMCQs(formattedMCQs) {
     const container = document.getElementById('mcqs');
     container.innerHTML = formattedMCQs;
-}
-
-function formatMCQ(text) {
-    const parts = text.split('\n');
-    const question = parts[0].replace(/^Question:\s*/, '');
-    const options = parts.slice(1).map(opt => opt.trim());
-    return `
-        <div class="question-text">${question}</div>
-        <ul class="options">
-            ${options.map(opt => `<li>${opt}</li>`).join('')}
-        </ul>
-    `;
 }
 
 function displayBlanks(formattedBlanks) {
@@ -289,5 +383,13 @@ async function exportToPDF() {
 }
 
 // Add event listeners
-document.getElementById('generateBtn').addEventListener('click', generateContent);
-document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('generateBtn').addEventListener('click', generateContent);
+    document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
+    
+    // Initialize file input
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileUpload);
+    }
+});
